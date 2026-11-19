@@ -2,6 +2,7 @@ name: Mantener GeoLotes activo
 on:
   schedule:
     - cron: "*/5 * * * *"   # GitHub puede retrasar las ejecuciones; cada 5 min deja margen ante el límite de 15 min de Render
+    - cron: "17 6 * * 1"   # semanal: renueva el cron para que GitHub no lo desactive por inactividad
   workflow_dispatch:
 permissions:
   actions: write
@@ -25,7 +26,7 @@ jobs:
           done
           echo "::warning::GeoLotes no respondió 200"; exit 1
       - name: Evitar que GitHub desactive el cron (60 días sin actividad)
-        if: github.event.schedule == '*/5 * * * *' && github.run_number % 2000 == 0 || github.event_name == 'workflow_dispatch'
+        if: github.event.schedule == '17 6 * * 1' || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/keepalive.yml/enable"

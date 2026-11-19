@@ -1,0 +1,31 @@
+name: Mantener GeoLotes activo
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # GitHub puede retrasar las ejecuciones; cada 5 min deja margen ante el límite de 15 min de Render
+  workflow_dispatch:
+permissions:
+  actions: write
+concurrency:
+  group: keepalive
+  cancel-in-progress: false
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Tocar el servidor (/api/health)
+        env:
+          URL: ${{ vars.TARGET_URL || 'https://geolotes.onrender.com/api/health' }}
+        run: |
+          for i in 1 2 3; do
+            code=$(curl -s -o body.txt -w '%{http_code}' -m 90 "$URL" || echo 000)
+            echo "intento $i -> HTTP $code $(cat body.txt 2>/dev/null)"
+            [ "$code" = "200" ] && exit 0
+            sleep 20
+          done
+          echo "::warning::GeoLotes no respondió 200"; exit 1
+      - name: Evitar que GitHub desactive el cron (60 días sin actividad)
+        if: github.event.schedule == '*/5 * * * *' && github.run_number % 2000 == 0 || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/keepalive.yml/enable"
